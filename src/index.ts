@@ -1,4 +1,3 @@
-import Anthropic from '@anthropic-ai/sdk';
 import { serve } from '@hono/node-server';
 import { loadConfig } from './config.js';
 import { openDb } from './db.js';
@@ -16,8 +15,12 @@ const inbox = new InboxStore(db);
 const settings = new SettingsStore(db);
 
 let bot: ReturnType<typeof createBot> | null = null;
+const brain = cfg.openrouterKey
+  ? new Brain({ apiKey: cfg.openrouterKey, model: cfg.openrouterModel, appUrl: cfg.appUrl })
+  : null;
+if (!brain) console.warn('OPENROUTER_API_KEY missing, brain offline; relay and inbox still work');
+
 if (cfg.telegramToken) {
-  const brain = new Brain(new Anthropic(), cfg.model, cfg.effort);
   bot = createBot(cfg, { history, inbox, settings, brain });
   if (!cfg.allowedUserIds.size) console.warn('ALLOWED_TELEGRAM_USER_ID is empty; the bot will refuse everyone');
 } else {
@@ -31,7 +34,7 @@ const app = createApp(cfg, {
 });
 
 const server = serve({ fetch: app.fetch, port: cfg.port }, (info) => {
-  console.log(`http listening on :${info.port} (model ${cfg.model}, effort ${cfg.effort}, data ${cfg.dataDir})`);
+  console.log(`http listening on :${info.port} (model ${brain ? brain.model : 'offline'}, data ${cfg.dataDir})`);
 });
 
 if (bot) {

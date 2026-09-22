@@ -1,47 +1,63 @@
-import Anthropic from '@anthropic-ai/sdk';
-import type { Effort } from './config.js';
+export type Role = 'system' | 'user' | 'assistant';
+
+export interface ChatMessage {
+  role: Role;
+  content: string;
+}
 
 export const SYSTEM_PROMPT = `You are the owner's personal assistant, reached from their phone over Telegram.
 Be concise and direct: short paragraphs, plain text, no Markdown tables or headers. Telegram renders your reply as plain text.
 You can hand work to "Claude Code", the coding agent running on the owner's Mac: anything the owner sends with /cc or a "cc:" prefix lands in an inbox that Claude Code polls. If a request needs files, a repo, or a terminal, say so and suggest the owner queue it with /cc. Claude Code can also push notes back to this chat.
 Keep conversation history in mind; the owner may pick up a thread hours later.`;
 
-export interface Reply {
-  text: string;
-  refused: boolean;
+const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
+
+export interface BrainOptions {
+  apiKey: string;
+  model: string;
+  appUrl: string;
+  timeoutMs?: number;
 }
 
-/** Thin wrapper around the Messages API for one chat turn. */
+/** One chat turn against OpenRouter's OpenAI-compatible chat completions endpoint. */
 export class Brain {
-  constructor(
-    private readonly client: Anthropic,
-    private readonly model: string,
-    private readonly effort: Effort,
-  ) {}
+  constructor(private readonly opts: BrainOptions) {}
 
-  async reply(history: Anthropic.Beta.BetaMessageParam[]): Promise<Reply> {
-    const message = await this.client.beta.messages
-      .stream({
-        model: this.model,
-        max_tokens: 16000,
-        system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
-        messages: history,
-        thinking: { type: 'adaptive' },
-        output_config: { effort: this.effort },
-        // Server-side refusal fallback: a policy decline is re-run on Anthropic's recommended model.
-        betas: ['server-side-fallback-2026-07-01'],
-        fallbacks: 'default',
-      })
-      .finalMessage();
+  get model(): string {
+    return this.opts.model;
+  }
 
-    if (message.stop_reason === 'refusal') return { text: '', refused: true };
+  async reply(history: ChatMessage[]): Promise<string> {
+    const res = await fetch(OPENROUTER_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.opts.apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': this.opts.appUrl,
+        'X-Title': 'telegram-agent',
+      },
+      body: JSON.stringify({
+        model: this.opts.model,
+        messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...history],
+        max_tokens: 4096,
+      }),
+      signal: AbortSignal.timeout(this.opts.timeoutMs ?? 120_000),
+    });
 
-    let text = message.content
-      .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === 'text')
-      .map((b) => b.text)
-      .join('')
-      .trim();
-    if (message.stop_reason === 'max_tokens') text += '\n\n[cut off at max_tokens]';
-    return { text, refused: false };
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new Error(`OpenRouter ${res.status}: ${body.slice(0, 300)}`);
+    }
+
+    const data = (await res.json()) as {
+      choices?: { message?: { content?: string | null }; finish_reason?: string }[];
+      error?: { message?: string };
+    };
+    if (data.error) throw new Error(`OpenRouter: ${data.error.message ?? 'unknown error'}`);
+
+    const choice = data.choices?.[0];
+    let text = (choice?.message?.content ?? '').trim();
+    if (choice?.finish_reason === 'length') text += '\n\n[cut off at max_tokens]';
+    return text;
   }
 }

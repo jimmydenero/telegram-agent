@@ -12,11 +12,12 @@ export interface BotDeps {
   history: HistoryStore;
   inbox: InboxStore;
   settings: SettingsStore;
-  brain: Brain;
+  /** null when OPENROUTER_API_KEY is missing */
+  brain: Brain | null;
 }
 
 const HELP = [
-  'Talk to me in plain text and I answer with Claude.',
+  'Talk to me in plain text and I answer with the model behind OpenRouter.',
   '/new - forget this conversation',
   '/cc <text> - queue text for Claude Code (or start a message with "cc:")',
   '/inbox - show what Claude Code has not picked up yet',
@@ -71,14 +72,15 @@ export function createBot(cfg: Config, deps: BotDeps): Bot {
     const text = ctx.message.text;
     if (/^cc:/i.test(text)) return queue(ctx, text.slice(3));
 
+    if (!brain) return ctx.reply('brain offline (OPENROUTER_API_KEY not set). /cc and /inbox still work.');
+
     const chatId = ctx.chat.id;
     await ctx.replyWithChatAction('typing');
     history.append(chatId, 'user', text);
     const reply = await brain.reply(history.load(chatId));
-    if (reply.refused) return ctx.reply('Claude declined to answer that.');
-    if (!reply.text) return ctx.reply('(empty reply)');
-    history.append(chatId, 'assistant', reply.text);
-    await sendText(ctx.api, chatId, reply.text);
+    if (!reply) return ctx.reply('(empty reply)');
+    history.append(chatId, 'assistant', reply);
+    await sendText(ctx.api, chatId, reply);
   });
 
   bot.catch(async (err) => {

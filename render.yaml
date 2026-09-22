@@ -17,15 +17,13 @@ services:
         value: "22"
       - key: DATA_DIR
         value: /data
-      - key: ANTHROPIC_MODEL
-        value: claude-opus-5
-      - key: ANTHROPIC_EFFORT
-        value: medium
+      - key: OPENROUTER_MODEL
+        value: google/gemini-3.8-flash
       - key: TELEGRAM_BOT_TOKEN
         sync: false
       - key: ALLOWED_TELEGRAM_USER_ID
         sync: false
-      - key: ANTHROPIC_API_KEY
+      - key: OPENROUTER_API_KEY
         sync: false
       - key: RELAY_SECRET
         sync: false

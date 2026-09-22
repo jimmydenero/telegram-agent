@@ -1,5 +1,3 @@
-export type Effort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
-
 export interface Config {
   port: number;
   dataDir: string;
@@ -7,12 +5,14 @@ export interface Config {
   allowedUserIds: Set<number>;
   ownerChatId: number | null;
   relaySecret: string;
-  model: string;
-  effort: Effort;
+  openrouterKey: string | null;
+  openrouterModel: string;
+  /** Sent as HTTP-Referer to OpenRouter so usage shows up under this app. */
+  appUrl: string;
   historyCap: number;
 }
 
-const EFFORTS: Effort[] = ['low', 'medium', 'high', 'xhigh', 'max'];
+export const DEFAULT_MODEL = 'google/gemini-3.8-flash';
 
 function idList(raw: string | undefined): Set<number> {
   const ids = (raw ?? '')
@@ -28,9 +28,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const relaySecret = env.RELAY_SECRET?.trim();
   if (!relaySecret) throw new Error('RELAY_SECRET is required');
 
-  const effort = (env.ANTHROPIC_EFFORT ?? 'medium') as Effort;
-  if (!EFFORTS.includes(effort)) throw new Error(`ANTHROPIC_EFFORT must be one of ${EFFORTS.join(', ')}`);
-
   const owner = env.OWNER_CHAT_ID ? Number(env.OWNER_CHAT_ID) : NaN;
   return {
     port: Number(env.PORT ?? 3000),
@@ -39,8 +36,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     allowedUserIds: idList(env.ALLOWED_TELEGRAM_USER_ID),
     ownerChatId: Number.isInteger(owner) ? owner : null,
     relaySecret,
-    model: env.ANTHROPIC_MODEL?.trim() || 'claude-opus-5',
-    effort,
+    openrouterKey: env.OPENROUTER_API_KEY?.trim() || null,
+    openrouterModel: env.OPENROUTER_MODEL?.trim() || DEFAULT_MODEL,
+    appUrl: env.APP_URL?.trim() || 'https://github.com/jimmydenero/telegram-agent',
     historyCap: Number(env.HISTORY_CAP ?? 40),
   };
 }

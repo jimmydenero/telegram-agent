@@ -1,4 +1,4 @@
-import type Anthropic from '@anthropic-ai/sdk';
+import type { ChatMessage } from '../brain.js';
 import type { Db } from '../db.js';
 
 type Role = 'user' | 'assistant';
@@ -10,7 +10,7 @@ export class HistoryStore {
     private readonly cap: number,
   ) {}
 
-  load(chatId: number): Anthropic.Beta.BetaMessageParam[] {
+  load(chatId: number): ChatMessage[] {
     const rows = this.db
       .prepare('SELECT role, content FROM messages WHERE chat_id = ? ORDER BY id')
       .all(chatId) as { role: Role; content: string }[];
