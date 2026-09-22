@@ -1,0 +1,26 @@
+{
+  "name": "telegram-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Personal Telegram agent with a Claude Code relay, hosted on Render",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/src/index.js",
+    "dev": "npm run build && node dist/src/index.js",
+    "test": "npm run build && node --test \"dist/test/**/*.test.js\""
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.127.0",
+    "@hono/node-server": "^2.1.1",
+    "better-sqlite3": "^13.0.3",
+    "grammy": "^1.46.0",
+    "hono": "^4.13.8"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^22",
+    "typescript": "^5"
+  }
+}

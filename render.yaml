@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: telegram-agent
+    runtime: node
+    plan: starter
+    region: oregon
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /healthz
+    autoDeploy: true
+    disk:
+      name: data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATA_DIR
+        value: /data
+      - key: ANTHROPIC_MODEL
+        value: claude-opus-5
+      - key: ANTHROPIC_EFFORT
+        value: medium
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: ALLOWED_TELEGRAM_USER_ID
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: RELAY_SECRET
+        sync: false
